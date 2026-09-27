@@ -1,0 +1,1047 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Simulador de Disco Cargado</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<style>
+/* ---------- Tokens ---------- */
+:root{
+  --bg:#EEF1F5; --surface:#FFFFFF; --surface-2:#F4F6F9;
+  --ink:#121B27; --ink-2:#3F4D5F; --muted:#66768A; --line:#D3DAE3; --grid:#E6EAF0;
+  --accent:#1F55C0; --accent-soft:#E1E9F9; --on-accent:#FFFFFF;
+  --pos:#C23A2B; --neg:#1F6FB8; --pt:#B26A06;
+  --good:#1D7A46; --good-bg:#E0F2E7; --warn:#835C00; --warn-bg:#FAF0D2;
+  --serious:#B04A12; --serious-bg:#FBE6D7; --crit:#B3261E; --crit-bg:#FBE2DF;
+  --sans:"Archivo", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono:"JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --r:12px;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#0D131B; --surface:#141C27; --surface-2:#1A2431;
+    --ink:#E6ECF3; --ink-2:#B1BECD; --muted:#8393A6; --line:#283646; --grid:#1F2A37;
+    --accent:#79A0FF; --accent-soft:#1B2A45; --on-accent:#0D131B;
+    --pos:#FF8272; --neg:#6DB2FF; --pt:#F0AE45;
+    --good:#5BC98A; --good-bg:#12301F; --warn:#E5BB4A; --warn-bg:#2F2610;
+    --serious:#F39159; --serious-bg:#33200F; --crit:#FF6E64; --crit-bg:#3A1512;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0D131B; --surface:#141C27; --surface-2:#1A2431;
+  --ink:#E6ECF3; --ink-2:#B1BECD; --muted:#8393A6; --line:#283646; --grid:#1F2A37;
+  --accent:#79A0FF; --accent-soft:#1B2A45; --on-accent:#0D131B;
+  --pos:#FF8272; --neg:#6DB2FF; --pt:#F0AE45;
+  --good:#5BC98A; --good-bg:#12301F; --warn:#E5BB4A; --warn-bg:#2F2610;
+  --serious:#F39159; --serious-bg:#33200F; --crit:#FF6E64; --crit-bg:#3A1512;
+}
+
+/* ---------- Base ---------- */
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background:var(--bg); color:var(--ink);
+  font:15px/1.55 var(--sans);
+  padding-inline:clamp(16px,3vw,40px); padding-block:28px 56px;
+  -webkit-font-smoothing:antialiased;
+}
+[hidden]{display:none!important}
+sup{font-size:.68em; line-height:0; vertical-align:super}
+:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+.wrap{max-width:1240px; margin:0 auto; display:flex; flex-direction:column; gap:24px}
+.mono{font-family:var(--mono)}
+
+/* ---------- Header ---------- */
+.top{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space-between; gap:14px 32px; padding-bottom:20px; border-bottom:1px solid var(--line)}
+.eyebrow{font:600 12px/1.2 var(--mono); letter-spacing:.09em; text-transform:uppercase; color:var(--muted); margin:0}
+h1{font-stretch:78%; font-weight:760; font-size:clamp(28px,3.6vw,42px); line-height:1.02; letter-spacing:-.01em; margin:8px 0 0; text-wrap:balance}
+h1 em{font-style:normal; color:var(--accent)}
+.top-formula{font:500 15px/1.4 var(--mono); color:var(--ink-2); padding:10px 14px; border:1px solid var(--line); border-radius:10px; background:var(--surface)}
+h2{font-stretch:88%; font-weight:700; font-size:20px; line-height:1.2; margin:0; text-wrap:balance}
+h3{font-size:15px; margin:0; font-weight:700}
+p{margin:0}
+.lead{color:var(--ink-2); max-width:66ch}
+
+/* ---------- Layout ---------- */
+.layout{display:grid; grid-template-columns:320px minmax(0,1fr); gap:24px; align-items:start}
+@media (max-width:920px){ .layout{grid-template-columns:minmax(0,1fr)} }
+.panel{background:var(--surface); border:1px solid var(--line); border-radius:var(--r)}
+aside.panel{position:sticky; top:16px; padding:20px; display:flex; flex-direction:column; gap:18px}
+@media (max-width:920px){ aside.panel{position:static} }
+main{display:flex; flex-direction:column; gap:24px; min-width:0}
+
+/* ---------- Inputs ---------- */
+.field{display:flex; flex-direction:column; gap:6px}
+.field label{font-weight:650; font-size:14px}
+.field .hint{font:12.5px/1.4 var(--mono); color:var(--muted)}
+.inputrow{display:flex; align-items:stretch; border:1px solid var(--line); border-radius:9px; background:var(--surface-2); overflow:hidden; transition:border-color .15s, box-shadow .15s}
+.inputrow:focus-within{border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft)}
+.inputrow input{flex:1; min-width:0; border:0; background:transparent; font:500 16px var(--mono); color:var(--ink); padding:10px 12px; outline:none}
+.inputrow .unit{display:flex; align-items:center; padding:0 12px; font:600 13px var(--mono); color:var(--muted); border-left:1px solid var(--line); background:var(--surface)}
+.field.invalid .inputrow{border-color:var(--crit)}
+.err{color:var(--crit); font-size:13px; line-height:1.4}
+.note{font-size:13px; color:var(--warn); background:var(--warn-bg); padding:8px 10px; border-radius:8px}
+.side-sep{border:0; border-top:1px solid var(--line); margin:0}
+.formulas{display:flex; flex-direction:column; gap:8px; font:13.5px/1.5 var(--mono); color:var(--ink-2)}
+.formulas b{color:var(--ink); font-weight:600}
+
+/* ---------- Buttons ---------- */
+.btn{font:650 14px/1 var(--sans); border-radius:9px; padding:10px 14px; border:1px solid var(--line); background:var(--surface); color:var(--ink); cursor:pointer; display:inline-flex; gap:8px; align-items:center; justify-content:center}
+.btn:hover{border-color:var(--accent); color:var(--accent)}
+.btn.primary{background:var(--accent); color:var(--on-accent); border-color:var(--accent)}
+.btn.primary:hover{filter:brightness(1.08); color:var(--on-accent)}
+.btn svg{width:16px; height:16px; flex:none}
+.btn-row{display:flex; flex-wrap:wrap; gap:10px}
+
+/* ---------- Scene (diagram + results) ---------- */
+.scene{overflow:hidden}
+.scene-head{display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:10px 20px; padding:18px 20px 0}
+.diagram-wrap{padding:6px 12px 0}
+.diagram-wrap svg{width:100%; height:auto; display:block}
+.subst{margin:0 20px 16px; padding:12px 14px; border-radius:9px; background:var(--surface-2); font:14px/1.7 var(--mono); color:var(--ink-2); overflow-x:auto; white-space:nowrap}
+.subst b{color:var(--ink); font-weight:600}
+.stats{display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); border-top:1px solid var(--line)}
+@media (max-width:680px){ .stats{grid-template-columns:minmax(0,1fr)} .stat{border-right:0!important; border-bottom:1px solid var(--line)} .stat:last-child{border-bottom:0} }
+.stat{padding:16px 20px; display:flex; flex-direction:column; gap:4px; border-right:1px solid var(--line); min-width:0}
+.stat:last-child{border-right:0}
+.stat .k{font-size:12.5px; color:var(--muted); font-weight:650; letter-spacing:.03em; text-transform:uppercase}
+.stat .v{font:600 23px/1.25 var(--mono); font-variant-numeric:tabular-nums; overflow-wrap:anywhere}
+.stat .v .u{font-size:14px; color:var(--ink-2); font-weight:500; margin-left:4px}
+.stat .s{font:12.5px/1.45 var(--mono); color:var(--ink-2)}
+
+/* ---------- Pills & chips ---------- */
+.pill{display:inline-flex; align-items:center; gap:8px; font:600 13px var(--sans); padding:5px 12px; border-radius:999px; border:1px solid var(--line); color:var(--ink-2); background:var(--surface-2)}
+.pill .dot{width:9px; height:9px; border-radius:50%; background:currentColor}
+.pill.pos{color:var(--pos)} .pill.neg{color:var(--neg)}
+.chip{display:inline-flex; align-items:center; gap:6px; padding:4px 10px; border-radius:999px; font:650 12.5px/1.2 var(--sans); white-space:nowrap}
+.chip i{font-style:normal; font-weight:800}
+.chip.good{color:var(--good); background:var(--good-bg)}
+.chip.warn{color:var(--warn); background:var(--warn-bg)}
+.chip.serious{color:var(--serious); background:var(--serious-bg)}
+.chip.crit{color:var(--crit); background:var(--crit-bg)}
+.chip.none{color:var(--muted); background:var(--surface-2)}
+
+/* ---------- Tabs ---------- */
+.workspace{padding:0 20px 22px}
+.tabs{display:flex; gap:2px; overflow-x:auto; border-bottom:1px solid var(--line); margin:0 -20px; padding:0 12px; scrollbar-width:thin}
+.tab{appearance:none; background:none; border:0; border-bottom:2px solid transparent; padding:14px 12px 12px; font:650 14px var(--sans); color:var(--muted); cursor:pointer; margin-bottom:-1px; white-space:nowrap}
+.tab:hover{color:var(--ink)}
+.tab[aria-selected="true"]{color:var(--ink); border-bottom-color:var(--accent)}
+.tab .n{font:600 11px var(--mono); color:var(--muted); margin-right:6px}
+.tabpanel{display:flex; flex-direction:column; gap:18px; padding-top:22px}
+.row-head{display:flex; flex-wrap:wrap; justify-content:space-between; align-items:flex-end; gap:10px 20px}
+
+/* ---------- Charts ---------- */
+.legend{display:flex; flex-wrap:wrap; gap:6px 20px; font-size:13px; color:var(--ink-2)}
+.legend span{display:inline-flex; align-items:center; gap:8px}
+.legend svg{flex:none}
+.chart-wrap{position:relative}
+.chart-wrap > svg{width:100%; height:auto; display:block; touch-action:pan-y}
+.tip{position:absolute; top:0; left:0; pointer-events:none; background:var(--surface); border:1px solid var(--line); border-radius:9px; padding:8px 11px; font:12.5px/1.55 var(--mono); color:var(--ink); box-shadow:0 8px 24px rgba(8,18,32,.16); white-space:nowrap; z-index:2}
+.tip .sw{display:inline-block; width:10px; height:3px; border-radius:2px; vertical-align:middle; margin-right:6px}
+.tip .x{color:var(--muted)}
+
+/* ---------- Tables ---------- */
+.tbl-wrap{overflow-x:auto; border:1px solid var(--line); border-radius:10px}
+.tbl-wrap.scroll{max-height:380px; overflow-y:auto}
+table{border-collapse:collapse; width:100%; font-variant-numeric:tabular-nums}
+th,td{padding:10px 14px; text-align:right; border-bottom:1px solid var(--line); white-space:nowrap}
+tr:last-child td{border-bottom:0}
+thead th{position:sticky; top:0; background:var(--surface-2); font:650 11.5px var(--sans); text-transform:uppercase; letter-spacing:.07em; color:var(--muted)}
+th:first-child, td:first-child{text-align:left}
+td{font:14px var(--mono)}
+td.name{font-family:var(--sans); font-weight:600}
+td input{width:9.5em; font:14px var(--mono); color:var(--ink); background:var(--surface-2); border:1px solid var(--line); border-radius:7px; padding:6px 8px; text-align:right}
+td input:focus{outline:none; border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft)}
+tr.hl td{background:var(--accent-soft)}
+
+/* ---------- Compare ---------- */
+.compare{display:grid; grid-template-columns:minmax(0,300px) minmax(0,1fr); gap:20px; align-items:start}
+@media (max-width:760px){ .compare{grid-template-columns:minmax(0,1fr)} }
+.verdict{display:flex; flex-direction:column; gap:14px; padding:18px; border:1px solid var(--line); border-radius:10px}
+.bars{display:flex; flex-direction:column; gap:12px}
+.bar-row{display:grid; grid-template-columns:92px minmax(0,1fr); gap:10px; align-items:center; font-size:13px; color:var(--ink-2)}
+.bar{height:12px; border-radius:0 4px 4px 0; background:var(--accent)}
+.bar.man{background:var(--ink-2)}
+.big{font:600 30px/1.1 var(--mono); font-variant-numeric:tabular-nums}
+.msg{color:var(--ink-2)}
+
+.explain{display:flex; flex-direction:column; gap:10px; max-width:70ch; color:var(--ink-2)}
+.explain code{font-family:var(--mono); font-size:.93em; color:var(--ink); background:var(--surface-2); padding:1px 6px; border-radius:5px}
+
+.guide{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:26px 36px}
+@media (max-width:1000px){ .guide{grid-template-columns:minmax(0,1fr)} }
+.guide section{display:flex; flex-direction:column; gap:10px; min-width:0}
+.guide h3{font-stretch:88%; font-size:16px; padding-bottom:8px; border-bottom:1px solid var(--line)}
+.guide ol,.guide ul{margin:0; padding-left:1.25em; display:flex; flex-direction:column; gap:7px; color:var(--ink-2)}
+.guide ul ul{margin-top:7px}
+.guide b{color:var(--ink)}
+.guide code{font-family:var(--mono); font-size:.9em; color:var(--ink); background:var(--surface-2); padding:1px 6px; border-radius:5px; overflow-wrap:anywhere}
+.stale-banner{display:flex; gap:10px; align-items:center; padding:12px 16px; border-radius:10px; color:var(--crit); background:var(--crit-bg); font-weight:600; font-size:14px}
+main.stale .dim{opacity:.4; pointer-events:none; filter:saturate(.4)}
+
+.toast{position:fixed; left:50%; bottom:calc(24px + env(safe-area-inset-bottom,0px)); transform:translateX(-50%); background:var(--ink); color:var(--bg); padding:10px 16px; border-radius:9px; font-size:14px; font-weight:600; z-index:10; box-shadow:0 10px 30px rgba(0,0,0,.25)}
+footer{color:var(--muted); font-size:13px; text-align:center}
+
+@media (prefers-reduced-motion: reduce){ *{transition:none!important} }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div>
+      <p class="eyebrow">Física II · Universidad Mariano Gálvez</p>
+      <h1>Potencial eléctrico de un <em>disco cargado</em></h1>
+    </div>
+    <div class="top-formula" aria-label="Fórmula del potencial">V(x) = 2πkσ (√(x² + R²) − x)</div>
+  </header>
+
+  <div class="layout">
+    <!-- ================= ENTRADA DE DATOS ================= -->
+    <aside class="panel" aria-labelledby="t-datos">
+      <h2 id="t-datos">Datos del problema</h2>
+
+      <div class="field" id="f-R">
+        <label for="inR">Radio del disco, R</label>
+        <div class="inputrow"><input id="inR" inputmode="decimal" autocomplete="off" value="0.160"><span class="unit">m</span></div>
+        <p class="err" id="errR" hidden></p>
+      </div>
+
+      <div class="field" id="f-Q">
+        <label for="inQ">Carga total, Q</label>
+        <div class="inputrow"><input id="inQ" inputmode="decimal" autocomplete="off" value="7.50"><span class="unit">µC</span></div>
+        <span class="hint" id="hintQ"></span>
+        <p class="err" id="errQ" hidden></p>
+      </div>
+
+      <div class="field" id="f-x">
+        <label for="inX">Distancia al punto P, x</label>
+        <div class="inputrow"><input id="inX" inputmode="decimal" autocomplete="off" value="0.120"><span class="unit">m</span></div>
+        <span class="hint">sobre el eje del disco, desde su centro</span>
+        <p class="err" id="errX" hidden></p>
+      </div>
+
+      <p class="note" id="noteQ0" hidden>Q = 0: el potencial es 0 en todo punto.</p>
+
+      <button class="btn" id="btnEnunciado" type="button">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M2.5 8a5.5 5.5 0 1 0 1.6-3.9"/><path d="M2.5 2.5v2.6h2.6"/></svg>
+        Usar datos del enunciado
+      </button>
+
+      <hr class="side-sep">
+
+      <div class="formulas">
+        <h3 style="font-family:var(--sans)">Modelo físico</h3>
+        <span><b>σ</b> = Q / (πR²)</span>
+        <span><b>V(x)</b> = 2πkσ (√(x² + R²) − x)</span>
+        <span><b>k</b> = 8.99 × 10<sup>9</sup> N·m²/C²</span>
+        <span style="color:var(--muted)">Acepta punto o coma decimal y notación 1.6e-1. Q puede ser negativa.</span>
+      </div>
+    </aside>
+
+    <!-- ================= RESULTADOS ================= -->
+    <main id="main">
+      <div class="stale-banner" id="staleBanner" hidden>
+        <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M8 1.8 15 14H1z"/><path d="M8 6v3.6M8 11.6v.4"/></svg>
+        Corrija los datos marcados para actualizar los resultados.
+      </div>
+
+      <section class="panel scene dim" aria-labelledby="t-res">
+        <div class="scene-head">
+          <h2 id="t-res">Resultados en el punto P</h2>
+          <span class="pill" id="signPill"><span class="dot"></span><span id="signTxt"></span></span>
+        </div>
+        <div class="diagram-wrap"><svg id="diagram" role="img" aria-label="Esquema del disco, el eje x y el punto P"></svg></div>
+        <div class="subst" id="subst"></div>
+        <div class="stats">
+          <div class="stat"><span class="k">Densidad superficial σ</span><span class="v" id="sSigma"></span><span class="s">σ = Q / (πR²)</span></div>
+          <div class="stat"><span class="k">Potencial V(x)</span><span class="v" id="sV"></span><span class="s" id="sVfull"></span></div>
+          <div class="stat"><span class="k">Verificación por anillos</span><span class="v" id="sRings"></span><span class="s" id="sRingsDiff"></span></div>
+        </div>
+      </section>
+
+      <section class="panel dim">
+        <div class="workspace">
+          <div class="tabs" role="tablist" aria-label="Herramientas del simulador">
+            <button class="tab" role="tab" id="tab-graf" aria-controls="p-graf" aria-selected="true"><span class="n">01</span>Gráfica V(x)</button>
+            <button class="tab" role="tab" id="tab-man" aria-controls="p-man" aria-selected="false" tabindex="-1"><span class="n">02</span>Comparar</button>
+            <button class="tab" role="tab" id="tab-val" aria-controls="p-val" aria-selected="false" tabindex="-1"><span class="n">03</span>Validación</button>
+            <button class="tab" role="tab" id="tab-far" aria-controls="p-far" aria-selected="false" tabindex="-1"><span class="n">04</span>x = 10R</button>
+            <button class="tab" role="tab" id="tab-dat" aria-controls="p-dat" aria-selected="false" tabindex="-1"><span class="n">05</span>Datos</button>
+            <button class="tab" role="tab" id="tab-ins" aria-controls="p-ins" aria-selected="false" tabindex="-1"><span class="n">06</span>Instrucciones y reglas</button>
+          </div>
+
+          <!-- 01 Gráfica -->
+          <div class="tabpanel" role="tabpanel" id="p-graf" aria-labelledby="tab-graf">
+            <div class="row-head">
+              <div>
+                <h2>Potencial sobre el eje del disco</h2>
+                <p class="lead" id="grafLead"></p>
+              </div>
+              <button class="btn" type="button" data-png="v">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M8 2v8M4.5 6.8 8 10.3l3.5-3.5M2.5 13.5h11"/></svg>
+                Descargar PNG
+              </button>
+            </div>
+            <div class="legend" id="legendV"></div>
+            <div class="chart-wrap"><svg id="chartV" role="img" aria-label="Gráfica del potencial V en función de x"></svg><div class="tip" id="tipV" hidden></div></div>
+          </div>
+
+          <!-- 02 Comparación manual -->
+          <div class="tabpanel" role="tabpanel" id="p-man" aria-labelledby="tab-man" hidden>
+            <div>
+              <h2>Comparación con el procedimiento manual</h2>
+              <p class="lead">Escriba el potencial que obtuvo a mano en el punto P. La diferencia se calcula respecto al simulador.</p>
+            </div>
+            <div class="compare">
+              <div class="field">
+                <label for="inVman">Potencial manual en P</label>
+                <div class="inputrow"><input id="inVman" inputmode="decimal" autocomplete="off" value="4.21e5"><span class="unit">V</span></div>
+                <span class="hint">Ejemplo precargado: 4.21e5 (resultado manual del enunciado)</span>
+                <p class="err" id="errVman" hidden></p>
+              </div>
+              <div class="verdict" id="verdict"></div>
+            </div>
+          </div>
+
+          <!-- 03 Validación -->
+          <div class="tabpanel" role="tabpanel" id="p-val" aria-labelledby="tab-val" hidden>
+            <div>
+              <h2>Validación del simulador</h2>
+              <p class="lead">Compare sus resultados manuales en el centro del disco (x = 0), en x = R y en x = 2R. Deje una casilla vacía para omitirla.</p>
+            </div>
+            <div class="tbl-wrap">
+              <table>
+                <thead><tr><th>Posición</th><th>Manual (V)</th><th>Simulador (V)</th><th>Diferencia</th><th>Estado</th></tr></thead>
+                <tbody id="valBody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- 04 Lejos -->
+          <div class="tabpanel" role="tabpanel" id="p-far" aria-labelledby="tab-far" hidden>
+            <div class="row-head">
+              <div>
+                <h2>Lejos del disco: ¿se comporta como una carga puntual?</h2>
+                <p class="lead">Se compara el modelo exacto del disco con el potencial de una carga puntual, V = kQ/x, en x = 10R.</p>
+              </div>
+              <button class="btn" type="button" data-png="far">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M8 2v8M4.5 6.8 8 10.3l3.5-3.5M2.5 13.5h11"/></svg>
+                Descargar PNG
+              </button>
+            </div>
+            <div class="tbl-wrap">
+              <div class="stats" style="border-top:0">
+                <div class="stat"><span class="k">Disco en x = 10R</span><span class="v" id="fDisc"></span><span class="s" id="fX"></span></div>
+                <div class="stat"><span class="k">Carga puntual kQ/x</span><span class="v" id="fPt"></span><span class="s">toda la carga en el centro</span></div>
+                <div class="stat"><span class="k">Diferencia</span><span class="v" id="fDif"></span><span class="s">teoría: ≈ (R/x)²/4 = 0.25 %</span></div>
+              </div>
+            </div>
+            <div class="legend" id="legendFar"></div>
+            <div class="chart-wrap"><svg id="chartFar" role="img" aria-label="Gráfica comparando el disco con una carga puntual"></svg><div class="tip" id="tipFar" hidden></div></div>
+            <h3>La diferencia disminuye al alejarse</h3>
+            <div class="tbl-wrap">
+              <table>
+                <thead><tr><th>x / R</th><th>x (m)</th><th>V disco (V)</th><th>V puntual (V)</th><th>Diferencia</th></tr></thead>
+                <tbody id="farBody"></tbody>
+              </table>
+            </div>
+            <div class="explain">
+              <h3 style="color:var(--ink)">Interpretación física</h3>
+              <p>Cuando x ≫ R, desde P el disco se ve como un punto: todas sus cargas están prácticamente a la misma distancia x.</p>
+              <p>Matemáticamente, <code>√(x² + R²) − x ≈ R²/(2x)</code>, por lo que <code>V ≈ 2πkσ · R²/(2x) = kQ/x</code>, que es el potencial de una carga puntual.</p>
+              <p>El error relativo es aproximadamente <code>(R/x)²/4</code>: en x = 10R es cerca de 0.25 % y tiende a cero conforme x crece.</p>
+            </div>
+          </div>
+
+          <!-- 05 Datos -->
+          <div class="tabpanel" role="tabpanel" id="p-dat" aria-labelledby="tab-dat" hidden>
+            <div class="row-head">
+              <div>
+                <h2>Tabla de datos V(x)</h2>
+                <p class="lead" id="datLead"></p>
+              </div>
+              <div class="btn-row">
+                <button class="btn primary" type="button" id="btnCSV">
+                  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M8 2v8M4.5 6.8 8 10.3l3.5-3.5M2.5 13.5h11"/></svg>
+                  CSV
+                </button>
+                <button class="btn" type="button" id="btnTXT">
+                  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M8 2v8M4.5 6.8 8 10.3l3.5-3.5M2.5 13.5h11"/></svg>
+                  TXT
+                </button>
+                <button class="btn" type="button" data-png="v">PNG gráfica V(x)</button>
+                <button class="btn" type="button" data-png="far">PNG comparación</button>
+              </div>
+            </div>
+            <div class="tbl-wrap scroll">
+              <table>
+                <thead><tr><th>#</th><th>x (m)</th><th>V(x) (V)</th></tr></thead>
+                <tbody id="datBody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- 06 Instrucciones -->
+          <div class="tabpanel" role="tabpanel" id="p-ins" aria-labelledby="tab-ins" hidden>
+            <div>
+              <h2>Instrucciones y reglas del simulador</h2>
+              <p class="lead">Cómo se usa la aplicación y qué reglas aplica en cada cálculo. Son las mismas que usa el programa simulador_disco.py.</p>
+            </div>
+            <div class="guide">
+              <section>
+                <h3>Cómo usarlo</h3>
+                <ol>
+                  <li>Escriba R, Q y x en el panel <b>Datos del problema</b>. Los resultados se actualizan mientras escribe; no hay botón de calcular.</li>
+                  <li>Arriba verá el esquema del disco con el punto P, la sustitución de la fórmula paso a paso y los tres resultados: σ, V(x) y la verificación por anillos.</li>
+                  <li>Use las pestañas para el resto del análisis:
+                    <ul>
+                      <li><b>01 Gráfica V(x)</b>: curva del potencial con el punto P. Pase el cursor (o el dedo) sobre la curva para leer valores.</li>
+                      <li><b>02 Comparar</b>: escriba su resultado manual en P y obtenga la diferencia porcentual.</li>
+                      <li><b>03 Validación</b>: compare sus resultados manuales en x = 0, x = R y x = 2R.</li>
+                      <li><b>04 x = 10R</b>: comparación con una carga puntual lejos del disco.</li>
+                      <li><b>05 Datos</b>: tabla de 200 puntos y descargas en CSV, TXT y PNG.</li>
+                    </ul>
+                  </li>
+                  <li><b>Usar datos del enunciado</b> vuelve a cargar R = 0.160 m, Q = 7.50 µC, x = 0.120 m y los resultados manuales del Paso 1.</li>
+                </ol>
+              </section>
+
+              <section>
+                <h3>Reglas de entrada y validación</h3>
+                <ul>
+                  <li>Unidades: <b>R y x en metros</b>, <b>Q en microcoulombs</b> (µC). Internamente Q se convierte a coulombs: Q(C) = Q(µC) × 10<sup>−6</sup>.</li>
+                  <li>El radio debe cumplir <code>R &gt; 0</code>.</li>
+                  <li>La distancia debe cumplir <code>x ≥ 0</code>. x = 0 es el centro del disco.</li>
+                  <li>Q puede ser positiva, negativa o cero. Si Q = 0 se avisa que el potencial es 0 en todo punto.</li>
+                  <li>Se aceptan punto o coma decimal (0.160 o 0,160) y notación científica (1.6e-1). No se aceptan letras ni valores infinitos.</li>
+                  <li>Si un dato no es válido, la casilla se marca en rojo con el motivo y los resultados se atenúan hasta que lo corrija.</li>
+                </ul>
+              </section>
+
+              <section>
+                <h3>Reglas de cálculo</h3>
+                <ul>
+                  <li>Densidad superficial: <code>σ = Q / (πR²)</code>.</li>
+                  <li>Potencial sobre el eje: <code>V(x) = 2πkσ (√(x² + R²) − x)</code>, con <code>k = 8.99 × 10⁹ N·m²/C²</code>.</li>
+                  <li>El signo de V es el signo de Q.</li>
+                  <li>Los resultados se muestran con <b>3 cifras significativas</b>, igual que los datos. Debajo aparece el valor completo con 7 cifras.</li>
+                  <li><b>Verificación por anillos</b>: el disco se divide en 10 000 anillos y se suma <code>dV = k·dq / √(x² + r²)</code> usando el radio medio de cada anillo. No usa la fórmula final, así que sirve para comprobarla.</li>
+                </ul>
+              </section>
+
+              <section>
+                <h3>Reglas de comparación</h3>
+                <ul>
+                  <li>La diferencia se calcula respecto al simulador: <code>diferencia % = |V<sub>sim</sub> − V<sub>manual</sub>| / |V<sub>sim</sub>| × 100</code>.</li>
+                  <li>Clasificación:
+                    <div class="tbl-wrap" style="margin-top:8px">
+                      <table><thead><tr><th>Diferencia</th><th>Estado</th><th>Mensaje</th></tr></thead><tbody>
+                        <tr><td>menor que 0.5 %</td><td><span class="chip good"><i aria-hidden="true">✓</i>Concordancia</span></td><td class="name" style="font-weight:400">Los resultados presentan concordancia.</td></tr>
+                        <tr><td>0.5 % a 2 %</td><td><span class="chip warn"><i aria-hidden="true">!</i>Diferencia pequeña</span></td><td class="name" style="font-weight:400">Verifique los redondeos.</td></tr>
+                        <tr><td>2 % a 5 %</td><td><span class="chip serious"><i aria-hidden="true">▲</i>Diferencia moderada</span></td><td class="name" style="font-weight:400">Revise los cálculos.</td></tr>
+                        <tr><td>5 % o más</td><td><span class="chip crit"><i aria-hidden="true">✕</i>Diferencia significativa</span></td><td class="name" style="font-weight:400">Revise el procedimiento.</td></tr>
+                      </tbody></table>
+                    </div>
+                  </li>
+                  <li>Si el simulador da 0: se considera concordancia cuando el valor manual también es 0; si no, la diferencia es 100 %.</li>
+                  <li>En la validación puede dejar casillas vacías; esa fila se muestra como “Sin dato”.</li>
+                </ul>
+              </section>
+
+              <section>
+                <h3>Gráficas y comprobación lejana</h3>
+                <ul>
+                  <li>La gráfica V(x) usa 200 puntos de x = 0 hasta 2R. Si el punto P está más lejos que 2R, la gráfica se extiende hasta P.</li>
+                  <li>La comprobación compara el disco con una carga puntual <code>V = kQ/x</code> en x = 10R. Para x ≫ R, <code>√(x² + R²) − x ≈ R²/(2x)</code>, así que el error relativo es cerca de <code>(R/x)²/4</code>: unos 0.25 % en x = 10R.</li>
+                  <li>La tabla de tendencia evalúa x = 1R, 2R, 5R, 10R, 20R y 50R. La gráfica comparativa va de 0.5R a 10R.</li>
+                </ul>
+              </section>
+
+              <section>
+                <h3>Archivos que se descargan</h3>
+                <ul>
+                  <li><code>datos_potencial.csv</code>: columnas x (m) y V(x) (V), con 6 decimales y notación científica. Se abre en Excel.</li>
+                  <li><code>datos_potencial.txt</code>: la misma tabla separada por tabuladores, con un encabezado que incluye R, Q y σ.</li>
+                  <li><code>grafica_potencial.png</code> y <code>grafica_comparacion_puntual.png</code>: imágenes en alta resolución (2280 × 1320 px), con título y datos, siempre en colores claros para el informe.</li>
+                  <li>Se guardan en la carpeta de descargas del navegador y tienen los mismos nombres y formato que los del programa en Python.</li>
+                </ul>
+              </section>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <footer>Simulador de potencial eléctrico · Proyecto de Física II · Versión web del programa simulador_disco.py</footer>
+</div>
+
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script>
+"use strict";
+// ==============================================================
+// CONSTANTES Y MODELO FÍSICO (igual que simulador_disco.py)
+// ==============================================================
+const K = 8.99e9;          // Constante de Coulomb (N·m²/C²)
+const N_PUNTOS = 200;      // Puntos para gráfica y exportación
+const N_ANILLOS = 10000;   // Anillos para la verificación numérica
+const ENUNCIADO = { R: "0.160", Q: "7.50", x: "0.120", Vman: "4.21e5", man: ["8.43e5", "3.49e5", "1.99e5"] };
+
+const calcularSigma = (R, Q) => Q / (Math.PI * R * R);
+const calcularPotencial = (R, Q, x) => 2 * Math.PI * K * calcularSigma(R, Q) * (Math.sqrt(x * x + R * R) - x);
+
+// Comprobación independiente: suma de dV = k dq / sqrt(x² + r²) de cada anillo
+function potencialPorAnillos(R, Q, x, n = N_ANILLOS) {
+  const sigma = calcularSigma(R, Q), dr = R / n;
+  let V = 0;
+  for (let i = 0; i < n; i++) {
+    const r = (i + 0.5) * dr;
+    V += K * (sigma * 2 * Math.PI * r * dr) / Math.sqrt(x * x + r * r);
+  }
+  return V;
+}
+
+const NIVELES = {
+  good:    { icon: "✓", label: "Concordancia" },
+  warn:    { icon: "!", label: "Diferencia pequeña" },
+  serious: { icon: "▲", label: "Diferencia moderada" },
+  crit:    { icon: "✕", label: "Diferencia significativa" },
+  none:    { icon: "–", label: "Sin dato" },
+};
+function compararResultados(Vsim, Vman) {
+  if (Vsim == null || Vman == null || !isFinite(Vman)) return { dif: null, nivel: "none", msg: "Sin resultado manual para comparar." };
+  if (Math.abs(Vsim) < 1e-15) {
+    if (Math.abs(Vman) < 1e-15) return { dif: 0, nivel: "good", msg: "Ambos resultados son cero." };
+    return { dif: 100, nivel: "crit", msg: "Los resultados no presentan concordancia." };
+  }
+  const dif = Math.abs(Vsim - Vman) / Math.abs(Vsim) * 100;
+  if (dif < 0.5) return { dif, nivel: "good", msg: "Los resultados presentan concordancia." };
+  if (dif < 2)   return { dif, nivel: "warn", msg: "Existe una diferencia pequeña. Verifique los redondeos." };
+  if (dif < 5)   return { dif, nivel: "serious", msg: "Existe una diferencia moderada. Revise los cálculos." };
+  return { dif, nivel: "crit", msg: "Existe una diferencia significativa. Revise el procedimiento." };
+}
+const chip = r => `<span class="chip ${r.nivel}"><i aria-hidden="true">${NIVELES[r.nivel].icon}</i>${NIVELES[r.nivel].label}</span>`;
+
+function generarDatos(R, Q, xEval) {
+  const lim = Math.max(2 * R, xEval || 0), xs = [], Vs = [];
+  for (let i = 0; i < N_PUNTOS; i++) { const x = lim * i / (N_PUNTOS - 1); xs.push(x); Vs.push(calcularPotencial(R, Q, x)); }
+  return { xs, Vs };
+}
+
+// ==============================================================
+// FORMATO DE NÚMEROS
+// ==============================================================
+const $ = id => document.getElementById(id);
+const MINUS = "−";
+const SUP = { "0":"⁰","1":"¹","2":"²","3":"³","4":"⁴","5":"⁵","6":"⁶","7":"⁷","8":"⁸","9":"⁹","-":"⁻" };
+function partes(v, c) { const [m, e] = v.toExponential(c - 1).split("e"); return [m.replace("-", MINUS), parseInt(e, 10)]; }
+// HTML con <sup>, 3 cifras significativas: 4.21 × 10<sup>5</sup>
+function sci(v, c = 3) {
+  if (v == null || !isFinite(v)) return "N/D";
+  if (v === 0) return "0";
+  const [m, e] = partes(v, c);
+  return e === 0 ? m : `${m} × 10<sup>${String(e).replace("-", MINUS)}</sup>`;
+}
+// Texto plano con superíndices Unicode (para SVG)
+function sciU(v, c = 3) {
+  if (v == null || !isFinite(v)) return "N/D";
+  if (v === 0) return "0";
+  const [m, e] = partes(v, c);
+  return e === 0 ? m : `${m} × 10${String(e).split("").map(d => SUP[d]).join("")}`;
+}
+// Igual que Python f"{v:.6e}" → 8.431000e+05
+function pyExp(v, d = 6) {
+  const [m, e] = v.toExponential(d).split("e");
+  return `${m}e${e[0] === "-" ? "-" : "+"}${e.replace(/[+-]/, "").padStart(2, "0")}`;
+}
+const g4 = v => (v === 0 ? "0" : String(+v.toPrecision(4)));
+// Datos con 3 cifras significativas, como el enunciado: 0.160, 7.50
+const f3 = v => (v === 0 ? "0" : Math.abs(v) >= 1000 || Math.abs(v) < 1e-3 ? sciU(v) : v.toPrecision(3).replace("-", MINUS));
+const fixed = (v, d) => (Math.abs(v) < 1e-12 ? 0 : v).toFixed(d).replace("-", MINUS);
+const esc = s => String(s).replace(/[&<>"]/g, ch => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[ch]));
+
+function leerNumero(texto) {
+  const s = String(texto).trim().replace(/−/g, "-").replace(/,/g, ".").replace(/\s+/g, "");
+  if (s === "") return null;
+  if (!/^[+-]?(\d+\.?\d*|\.\d+)(e[+-]?\d+)?$/i.test(s)) return NaN;
+  const v = Number(s);
+  return isFinite(v) ? v : NaN;
+}
+
+// ==============================================================
+// COLORES (tomados del tema activo)
+// ==============================================================
+const TOKENS = ["surface","surface-2","ink","ink-2","muted","line","grid","accent","pos","neg","pt"];
+function colores() {
+  const cs = getComputedStyle(document.documentElement), c = {};
+  TOKENS.forEach(t => c[t.replace("-2", "2")] = cs.getPropertyValue("--" + t).trim());
+  return c;
+}
+// Paleta clara fija para las imágenes PNG (quedan bien en un informe impreso)
+const CLARO = { surface:"#FFFFFF", surface2:"#F4F6F9", ink:"#121B27", ink2:"#3F4D5F", muted:"#66768A", line:"#C9D1DC", grid:"#E6EAF0", accent:"#1F55C0", pos:"#C23A2B", neg:"#1F6FB8", pt:"#B26A06" };
+const FONT = `font-family="JetBrains Mono, ui-monospace, Menlo, Consolas, monospace"`;
+const T = (fill, size, extra = "") => `fill="${fill}" font-size="${size}" ${FONT} ${extra}`;
+
+// ==============================================================
+// ESTADO
+// ==============================================================
+let st = null;   // {R, Q, x} último conjunto de datos válido
+let ult = {};    // configuraciones de las gráficas (para exportar)
+
+function validarEntradas() {
+  const R = leerNumero($("inR").value), Qm = leerNumero($("inQ").value), x = leerNumero($("inX").value);
+  const err = {};
+  const NUM = "Escriba un número, por ejemplo 0.160 o 1.6e-1.";
+  if (R === null) err.R = "Ingrese el radio del disco.";
+  else if (isNaN(R)) err.R = NUM;
+  else if (R <= 0) err.R = "El radio debe ser mayor que cero (R > 0).";
+  if (Qm === null) err.Q = "Ingrese la carga total.";
+  else if (isNaN(Qm)) err.Q = NUM;
+  if (x === null) err.x = "Ingrese la distancia al punto P.";
+  else if (isNaN(x)) err.x = NUM;
+  else if (x < 0) err.x = "La distancia debe ser mayor o igual a cero (x ≥ 0).";
+
+  [["R","errR","f-R"],["Q","errQ","f-Q"],["x","errX","f-x"]].forEach(([k, e, f]) => {
+    $(e).hidden = !err[k]; $(e).textContent = err[k] || "";
+    $(f).classList.toggle("invalid", !!err[k]);
+  });
+  $("hintQ").innerHTML = (Qm != null && !isNaN(Qm)) ? `= ${sci(Qm * 1e-6)} C` : "&nbsp;";
+  const ok = Object.keys(err).length === 0;
+  $("main").classList.toggle("stale", !ok);
+  $("staleBanner").hidden = ok;
+  if (!ok) return null;
+  $("noteQ0").hidden = Qm !== 0;
+  return { R, Q: Qm * 1e-6, x };
+}
+
+function actualizar() {
+  const d = validarEntradas();
+  if (!d) return;
+  st = d;
+  renderResultados();
+  renderDiagrama();
+  renderGrafica();
+  renderManual();
+  renderValidacion();
+  renderLejos();
+  renderDatos();
+}
+
+// ==============================================================
+// RESULTADOS PRINCIPALES
+// ==============================================================
+function renderResultados() {
+  const { R, Q, x } = st;
+  const sigma = calcularSigma(R, Q), V = calcularPotencial(R, Q, x), Vn = potencialPorAnillos(R, Q, x);
+  const raiz = Math.sqrt(x * x + R * R);
+  $("sSigma").innerHTML = `${sci(sigma)}<span class="u">C/m²</span>`;
+  $("sV").innerHTML = `${sci(V)}<span class="u">V</span>`;
+  $("sVfull").innerHTML = `valor completo: ${sci(V, 7)} V`;
+  $("sRings").innerHTML = `${sci(Vn)}<span class="u">V</span>`;
+  const dRel = V !== 0 ? Math.abs(Vn - V) / Math.abs(V) * 100 : 0;
+  $("sRingsDiff").innerHTML = `suma de 10 000 anillos · diferencia ${dRel === 0 ? "0" : sci(dRel)} %`;
+  $("subst").innerHTML =
+    `V = 2π · k · σ · (√(x² + R²) − x)<br>` +
+    `&nbsp;&nbsp;= 2π · (8.99 × 10<sup>9</sup>) · (${sci(sigma)}) · (${g4(raiz)} − ${g4(x)})<br>` +
+    `&nbsp;&nbsp;= <b>${sci(V)} V</b>`;
+  const pill = $("signPill");
+  pill.className = "pill " + (Q > 0 ? "pos" : Q < 0 ? "neg" : "");
+  $("signTxt").textContent = Q > 0 ? "Q > 0 · potencial positivo" : Q < 0 ? "Q < 0 · potencial negativo" : "Q = 0 · potencial nulo";
+}
+
+// ==============================================================
+// ESQUEMA DEL DISCO Y EL PUNTO P
+// ==============================================================
+function renderDiagrama() {
+  const c = colores(), { R, Q, x } = st;
+  const W = 760, H = 250, cx = 118, cy = 128, ry = 80, rx = 30;
+  const hs = 190;                              // px por cada R en el eje (esquema, no a escala)
+  const maxRatio = (W - 200 - cx) / hs;
+  const ratio = x / R, roto = ratio > maxRatio;
+  const px = cx + Math.min(ratio, maxRatio) * hs;
+  const qcol = Q > 0 ? c.pos : Q < 0 ? c.neg : c.muted;
+  const signo = Q > 0 ? "+" : Q < 0 ? MINUS : "";
+  const V = calcularPotencial(R, Q, x);
+  let s = `<defs><marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10z" fill="${c.muted}"/></marker></defs>`;
+  // eje x
+  s += `<line x1="${cx - 60}" y1="${cy}" x2="${W - 28}" y2="${cy}" stroke="${c.muted}" stroke-width="1.5" marker-end="url(#arr)"/>`;
+  s += `<text x="${W - 30}" y="${cy - 10}" text-anchor="end" ${T(c.muted, 13)}>eje x</text>`;
+  // disco
+  s += `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="${qcol}" fill-opacity="0.13" stroke="${qcol}" stroke-width="2"/>`;
+  if (signo) {
+    [[0,0],[0,.42],[0,-.42],[0,.78],[0,-.78],[.55,.2],[-.55,-.2],[.5,-.6],[-.5,.6]].forEach(([fx, fy]) => {
+      s += `<text x="${cx + fx * rx}" y="${cy + fy * ry + 4.5}" text-anchor="middle" ${T(qcol, 13, 'font-weight="700"')}>${signo}</text>`;
+    });
+  }
+  // R
+  s += `<line x1="${cx}" y1="${cy}" x2="${cx}" y2="${cy - ry}" stroke="${c.ink2}" stroke-width="1.2" stroke-dasharray="3 3"/>`;
+  s += `<text x="${cx}" y="${cy - ry - 12}" text-anchor="middle" ${T(c.ink, 13, 'font-weight="600"')}>R = ${f3(R)} m</text>`;
+  s += `<text x="${cx}" y="${cy + ry + 26}" text-anchor="middle" ${T(c.muted, 12)}>σ = ${sciU(calcularSigma(R, Q))} C/m²</text>`;
+  // distancia del borde a P
+  if (px - cx > 150) {
+    s += `<line x1="${cx}" y1="${cy - ry}" x2="${px}" y2="${cy}" stroke="${c.muted}" stroke-width="1.2" stroke-dasharray="5 4"/>`;
+    const mx = (cx + px) / 2, my = (cy - ry + cy) / 2, ang = Math.atan2(ry, px - cx) * 180 / Math.PI;
+    s += `<text transform="translate(${mx} ${my}) rotate(${ang.toFixed(1)}) translate(0 -8)" text-anchor="middle" ${T(c.ink2, 12.5)}>√(x² + R²) = ${f3(Math.sqrt(x * x + R * R))} m</text>`;
+  }
+  // cota x
+  if (x > 0) {
+    const yd = cy + 30;
+    s += `<line x1="${cx}" y1="${yd}" x2="${px}" y2="${yd}" stroke="${c.ink2}" stroke-width="1.2"/>`;
+    s += `<line x1="${cx}" y1="${yd - 6}" x2="${cx}" y2="${yd + 6}" stroke="${c.ink2}" stroke-width="1.2"/>`;
+    s += `<line x1="${px}" y1="${yd - 6}" x2="${px}" y2="${yd + 6}" stroke="${c.ink2}" stroke-width="1.2"/>`;
+    s += `<text x="${Math.max((cx + px) / 2, cx + 70)}" y="${yd + 22}" text-anchor="middle" ${T(c.ink, 13, 'font-weight="600"')}>x = ${f3(x)} m</text>`;
+    if (roto) {
+      s += `<path d="M${px - 42} ${cy + 7} l8 -14 M${px - 34} ${cy + 7} l8 -14" stroke="${c.ink2}" stroke-width="1.6" fill="none"/>`;
+      s += `<text x="${px - 30}" y="${yd - 10}" text-anchor="middle" ${T(c.muted, 11)}>escala cortada</text>`;
+    }
+  }
+  // punto P
+  const anchor = px > W - 220 ? "end" : "start", dx = anchor === "end" ? -14 : 14;
+  s += `<circle cx="${px}" cy="${cy}" r="7" fill="${c.ink}" stroke="${c.surface}" stroke-width="3"/>`;
+  s += `<text x="${px + dx}" y="${cy - 34}" text-anchor="${anchor}" ${T(c.ink, 16, 'font-weight="700"')}>P</text>`;
+  s += `<text x="${px + dx}" y="${cy - 14}" text-anchor="${anchor}" ${T(c.ink, 13.5, 'font-weight="600"')}>V = ${sciU(V)} V</text>`;
+  const svg = $("diagram");
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svg.innerHTML = s;
+}
+
+// ==============================================================
+// GRÁFICAS (SVG hecho a mano, con cursor y tooltip)
+// ==============================================================
+function escalaBonita(lo, hi, n) {
+  const paso0 = (hi - lo) / n, p = 10 ** Math.floor(Math.log10(paso0)), f = paso0 / p;
+  const paso = (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10) * p;
+  const a = Math.floor(lo / paso + 1e-9) * paso, b = Math.ceil(hi / paso - 1e-9) * paso, ticks = [];
+  for (let v = a; v <= b + paso * 1e-6; v += paso) ticks.push(+v.toPrecision(12));
+  return { ticks, lo: a, hi: b, paso };
+}
+
+function graficaLineas(svg, tip, o, c) {
+  const W = 760, H = o.titulo ? 440 : 400;
+  const m = { l: 74, r: 26, t: o.titulo ? 78 : 30, b: 58 };
+  const iw = W - m.l - m.r, ih = H - m.t - m.b;
+  const [x0, x1] = o.xDom;
+  let lo = 0, hi = 0;
+  o.series.forEach(se => se.ys.forEach(y => { if (y < lo) lo = y; if (y > hi) hi = y; }));
+  if (lo === hi) { lo = -1; hi = 1; }
+  const e = Math.floor(Math.log10(Math.max(Math.abs(lo), Math.abs(hi)))), f = 10 ** e;
+  const ye = escalaBonita(lo, hi, 5); lo = ye.lo; hi = ye.hi;
+  const X = v => m.l + (v - x0) / (x1 - x0) * iw, Y = v => m.t + (hi - v) / (hi - lo) * ih;
+  const yd = Math.max(0, -Math.floor(Math.log10(ye.paso / f) + 1e-9));
+  const xe = escalaBonita(x0, x1, 6), xd = Math.max(0, -Math.floor(Math.log10(xe.paso) + 1e-9));
+
+  let s = `<rect x="0" y="0" width="${W}" height="${H}" fill="${c.surface}"/>`;
+  if (o.titulo) {
+    s += `<text x="${W / 2}" y="30" text-anchor="middle" ${T(c.ink, 17, 'font-weight="700"')}>${esc(o.titulo)}</text>`;
+    s += `<text x="${W / 2}" y="52" text-anchor="middle" ${T(c.ink2, 13)}>${esc(o.subtitulo || "")}</text>`;
+  }
+  // rejilla y marcas del eje y
+  ye.ticks.forEach(v => {
+    const y = Y(v);
+    s += `<line x1="${m.l}" x2="${m.l + iw}" y1="${y}" y2="${y}" stroke="${Math.abs(v) < 1e-12 ? c.line : c.grid}" stroke-width="1"/>`;
+    s += `<text x="${m.l - 10}" y="${y + 4}" text-anchor="end" ${T(c.muted, 12)}>${fixed(v / f, yd)}</text>`;
+  });
+  // marcas del eje x
+  xe.ticks.forEach(v => {
+    if (v < x0 - 1e-12 || v > x1 + 1e-12) return;
+    const x = X(v);
+    s += `<line x1="${x}" x2="${x}" y1="${m.t + ih}" y2="${m.t + ih + 5}" stroke="${c.muted}" stroke-width="1"/>`;
+    s += `<text x="${x}" y="${m.t + ih + 20}" text-anchor="middle" ${T(c.muted, 12)}>${fixed(v, xd)}</text>`;
+  });
+  s += `<line x1="${m.l}" x2="${m.l + iw}" y1="${m.t + ih}" y2="${m.t + ih}" stroke="${c.muted}" stroke-width="1"/>`;
+  // títulos de ejes
+  s += `<text x="${m.l + iw / 2}" y="${H - 12}" text-anchor="middle" ${T(c.ink2, 13)}>${esc(o.xTitulo)}</text>`;
+  const yTit = e === 0 ? "Potencial V (V)" : `Potencial V (× 10${String(e).split("").map(d => SUP[d]).join("")} V)`;
+  s += `<text transform="translate(18 ${m.t + ih / 2}) rotate(-90)" text-anchor="middle" ${T(c.ink2, 13)}>${yTit}</text>`;
+  // líneas verticales de referencia
+  (o.vlineas || []).forEach(vl => {
+    if (vl.x < x0 || vl.x > x1) return;
+    const x = X(vl.x);
+    s += `<line x1="${x}" x2="${x}" y1="${m.t}" y2="${m.t + ih}" stroke="${c.muted}" stroke-width="1" stroke-dasharray="2 4"/>`;
+    s += `<text x="${x}" y="${m.t - 8}" text-anchor="${x > m.l + iw - 20 ? "end" : "middle"}" ${T(c.muted, 12)}>${esc(vl.label)}</text>`;
+  });
+  // guías del punto
+  (o.puntos || []).forEach(p => {
+    if (!p.guias) return;
+    s += `<path d="M${m.l} ${Y(p.y)} H${X(p.x)} V${m.t + ih}" fill="none" stroke="${c.muted}" stroke-width="1" stroke-dasharray="5 4" opacity=".8"/>`;
+  });
+  // series
+  o.series.forEach(se => {
+    const d = o.xs.map((x, i) => `${i ? "L" : "M"}${X(x).toFixed(2)} ${Y(se.ys[i]).toFixed(2)}`).join("");
+    s += `<path d="${d}" fill="none" stroke="${se.color}" stroke-width="2.25" stroke-linejoin="round" stroke-linecap="round" ${se.dash ? `stroke-dasharray="${se.dash}"` : ""}/>`;
+  });
+  // puntos destacados
+  (o.puntos || []).forEach(p => {
+    const px = X(p.x), py = Y(p.y), fin = px > m.l + iw * 0.62;
+    s += `<circle cx="${px}" cy="${py}" r="6.5" fill="${p.color}" stroke="${c.surface}" stroke-width="2.5"/>`;
+    s += `<text x="${px + (fin ? -14 : 14)}" y="${py - 14}" text-anchor="${fin ? "end" : "start"}" ${T(c.ink, 13, 'font-weight="600"')}>${esc(p.label)}</text>`;
+  });
+  // capa de hover
+  if (tip) {
+    s += `<g class="hover" visibility="hidden"><line class="hx" y1="${m.t}" y2="${m.t + ih}" stroke="${c.ink2}" stroke-width="1" opacity=".55"/>`;
+    o.series.forEach((se, k) => { s += `<circle class="hd" data-k="${k}" r="5" fill="${se.color}" stroke="${c.surface}" stroke-width="2"/>`; });
+    s += `</g><rect class="hit" x="${m.l}" y="${m.t}" width="${iw}" height="${ih}" fill="transparent"/>`;
+  }
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svg.innerHTML = s;
+  if (!tip) return;
+
+  svg._ctx = { o, X, Y, m, iw, W };
+  if (!svg._eventos) {
+    svg._eventos = true;
+    const mover = ev => {
+      const ctx = svg._ctx, r = svg.getBoundingClientRect();
+      const sx = (ev.clientX - r.left) / r.width * ctx.W;
+      if (sx < ctx.m.l - 6 || sx > ctx.m.l + ctx.iw + 6) return ocultar();
+      const xs = ctx.o.xs, paso = xs[1] - xs[0];
+      const xv = ctx.o.xDom[0] + (sx - ctx.m.l) / ctx.iw * (ctx.o.xDom[1] - ctx.o.xDom[0]);
+      const i = Math.max(0, Math.min(xs.length - 1, Math.round((xv - xs[0]) / paso)));
+      const hx = ctx.X(xs[i]);
+      const g = svg.querySelector(".hover");
+      g.setAttribute("visibility", "visible");
+      g.querySelector(".hx").setAttribute("x1", hx); g.querySelector(".hx").setAttribute("x2", hx);
+      g.querySelectorAll(".hd").forEach(dot => { const se = ctx.o.series[+dot.dataset.k]; dot.setAttribute("cx", hx); dot.setAttribute("cy", ctx.Y(se.ys[i])); });
+      let h = `<div class="x">x = ${g4(xs[i])} m${ctx.o.xR ? ` · ${g4(xs[i] / ctx.o.xR)} R` : ""}</div>`;
+      ctx.o.series.forEach(se => { h += `<div><span class="sw" style="background:${se.color}"></span>${esc(se.corto)}: ${sci(se.ys[i], 4)} V</div>`; });
+      if (ctx.o.extra) h += ctx.o.extra(i);
+      tip.innerHTML = h; tip.hidden = false;
+      const escala = r.width / ctx.W, tw = tip.offsetWidth, th = tip.offsetHeight;
+      let left = hx * escala + 16;
+      if (left + tw > r.width - 4) left = hx * escala - tw - 16;
+      const top = Math.max(0, Math.min((ev.clientY - r.top) - th / 2, r.height - th));
+      tip.style.transform = `translate(${Math.max(0, left)}px, ${top}px)`;
+    };
+    const ocultar = () => { tip.hidden = true; const g = svg.querySelector(".hover"); if (g) g.setAttribute("visibility", "hidden"); };
+    svg.addEventListener("pointermove", mover);
+    svg.addEventListener("pointerdown", mover);
+    svg.addEventListener("pointerleave", ocultar);
+  }
+}
+
+function leyenda(el, items) {
+  el.innerHTML = items.map(it => it.tipo === "punto"
+    ? `<span><svg width="14" height="14" aria-hidden="true"><circle cx="7" cy="7" r="5.5" fill="${it.color}"/></svg>${it.nombre}</span>`
+    : `<span><svg width="26" height="10" aria-hidden="true"><line x1="1" y1="5" x2="25" y2="5" stroke="${it.color}" stroke-width="2.5" stroke-linecap="round" ${it.dash ? `stroke-dasharray="${it.dash}"` : ""}/></svg>${it.nombre}</span>`).join("");
+}
+
+function configV(c) {
+  const { R, Q, x } = st, { xs, Vs } = generarDatos(R, Q, x), Vp = calcularPotencial(R, Q, x);
+  return {
+    xs, xR: R, xDom: [0, xs[xs.length - 1]],
+    series: [{ nombre: "V(x) del disco", corto: "V", ys: Vs, color: c.accent }],
+    puntos: [{ x, y: Vp, color: c.ink, guias: true, label: `P (${f3(x)} m, ${sciU(Vp)} V)` }],
+    vlineas: [{ x: R, label: "x = R" }, { x: 2 * R, label: "x = 2R" }],
+    xTitulo: "Distancia sobre el eje, x (m)",
+    titulo: "Potencial eléctrico sobre el eje de un disco cargado",
+    subtitulo: `R = ${f3(R)} m,  Q = ${f3(Q * 1e6)} µC,  x evaluado = ${f3(x)} m`,
+  };
+}
+
+function renderGrafica() {
+  const c = colores(), { R, x } = st;
+  ult.v = configV;
+  const o = configV(c);
+  const vista = { ...o, titulo: null };
+  graficaLineas($("chartV"), $("tipV"), vista, c);
+  leyenda($("legendV"), [{ nombre: "V(x) del disco", color: c.accent }, { nombre: "Punto P evaluado", color: c.ink, tipo: "punto" }]);
+  $("grafLead").innerHTML = `De x = 0 a x = ${g4(o.xDom[1])} m (${x > 2 * R ? "hasta el punto P" : "2R"}). Pase el cursor sobre la curva para leer valores.`;
+}
+
+// ==============================================================
+// COMPARACIÓN CON EL RESULTADO MANUAL
+// ==============================================================
+function renderManual() {
+  const V = calcularPotencial(st.R, st.Q, st.x);
+  const raw = $("inVman").value, Vm = leerNumero(raw);
+  const bad = Vm !== null && isNaN(Vm);
+  $("errVman").hidden = !bad; $("errVman").textContent = bad ? "Escriba un número, por ejemplo 4.21e5." : "";
+  const r = compararResultados(V, bad ? null : Vm);
+  let barras = "";
+  if (r.dif !== null) {
+    const mx = Math.max(Math.abs(V), Math.abs(Vm)) || 1;
+    barras = `<div class="bars" aria-hidden="true">
+      <div class="bar-row"><span>Simulador</span><div class="bar" style="width:${Math.abs(V) / mx * 100}%"></div></div>
+      <div class="bar-row"><span>Manual</span><div class="bar man" style="width:${Math.abs(Vm) / mx * 100}%"></div></div></div>`;
+  }
+  $("verdict").innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+      <span class="k" style="font-size:12.5px;font-weight:650;color:var(--muted);text-transform:uppercase;letter-spacing:.03em">Diferencia porcentual</span>${chip(r)}
+    </div>
+    <div class="big">${r.dif === null ? "—" : r.dif.toFixed(4) + " %"}</div>
+    <p class="msg">${r.msg}</p>
+    <div class="tbl-wrap"><table><tbody>
+      <tr><td class="name">Simulador</td><td>${sci(V)} V</td></tr>
+      <tr><td class="name">Manual</td><td>${Vm === null || bad ? "N/D" : sci(Vm) + " V"}</td></tr>
+    </tbody></table></div>
+    ${barras}`;
+}
+
+// ==============================================================
+// VALIDACIÓN EN x = 0, R, 2R
+// ==============================================================
+function construirValidacion() {
+  const nombres = ["x = 0", "x = R", "x = 2R"];
+  $("valBody").innerHTML = nombres.map((n, i) => `
+    <tr><td class="name">${n} <span class="mono" style="color:var(--muted);font-weight:400" id="vpos${i}"></span></td>
+    <td><input id="man${i}" inputmode="decimal" autocomplete="off" aria-label="V manual en ${n}" value="${ENUNCIADO.man[i]}"></td>
+    <td id="vsim${i}"></td><td id="vdif${i}"></td><td id="vest${i}"></td></tr>`).join("");
+  [0, 1, 2].forEach(i => $("man" + i).addEventListener("input", renderValidacion));
+}
+function renderValidacion() {
+  const pos = [0, st.R, 2 * st.R];
+  pos.forEach((p, i) => {
+    const Vs = calcularPotencial(st.R, st.Q, p), Vm = leerNumero($("man" + i).value);
+    const r = compararResultados(Vs, Vm === null || isNaN(Vm) ? null : Vm);
+    $("vpos" + i).textContent = `(${g4(p)} m)`;
+    $("vsim" + i).innerHTML = sci(Vs);
+    $("vdif" + i).textContent = r.dif === null ? "N/D" : r.dif.toFixed(3) + " %";
+    $("vest" + i).innerHTML = chip(r);
+  });
+}
+
+// ==============================================================
+// COMPROBACIÓN ADICIONAL x = 10R
+// ==============================================================
+function configFar(c) {
+  const { R, Q } = st, xL = 10 * R, xs = [], Vd = [], Vp = [];
+  for (let i = 0; i < 300; i++) { const x = 0.5 * R + (xL - 0.5 * R) * i / 299; xs.push(x); Vd.push(calcularPotencial(R, Q, x)); Vp.push(K * Q / x); }
+  const V10 = calcularPotencial(R, Q, xL), dif = compararResultados(V10, K * Q / xL).dif;
+  return {
+    xs, xR: R, xDom: [xs[0], xL],
+    series: [
+      { nombre: "Disco (modelo exacto)", corto: "Disco", ys: Vd, color: c.accent },
+      { nombre: "Carga puntual kQ/x", corto: "kQ/x", ys: Vp, color: c.pt, dash: "7 5" },
+    ],
+    puntos: [{ x: xL, y: V10, color: c.ink, label: `x = 10R: diferencia ${dif.toFixed(2)} %` }],
+    vlineas: [{ x: R, label: "R" }, { x: 5 * R, label: "5R" }],
+    extra: i => { const d = compararResultados(Vd[i], Vp[i]).dif; return `<div class="x">diferencia: ${d.toFixed(3)} %</div>`; },
+    xTitulo: "Distancia sobre el eje, x (m)",
+    titulo: "Disco cargado vs. carga puntual",
+    subtitulo: `R = ${f3(R)} m,  Q = ${f3(Q * 1e6)} µC,  de 0.5R a 10R`,
+  };
+}
+function renderLejos() {
+  const c = colores(), { R, Q } = st, xL = 10 * R;
+  const Vd = calcularPotencial(R, Q, xL), Vp = K * Q / xL, r = compararResultados(Vd, Vp);
+  $("fDisc").innerHTML = `${sci(Vd, 4)}<span class="u">V</span>`;
+  $("fPt").innerHTML = `${sci(Vp, 4)}<span class="u">V</span>`;
+  $("fDif").innerHTML = r.dif === null || Q === 0 ? "—" : `${r.dif.toFixed(3)}<span class="u">%</span>`;
+  $("fX").textContent = `x = 10R = ${g4(xL)} m`;
+  ult.far = configFar;
+  if (Q === 0) { $("chartFar").innerHTML = ""; $("legendFar").innerHTML = "Con Q = 0 ambos modelos valen 0."; }
+  else {
+    graficaLineas($("chartFar"), $("tipFar"), { ...configFar(c), titulo: null }, c);
+    leyenda($("legendFar"), [
+      { nombre: "Disco (modelo exacto)", color: c.accent },
+      { nombre: "Carga puntual kQ/x", color: c.pt, dash: "7 5" },
+      { nombre: "x = 10R", color: c.ink, tipo: "punto" },
+    ]);
+  }
+  $("farBody").innerHTML = [1, 2, 5, 10, 20, 50].map(n => {
+    const xv = n * R, a = calcularPotencial(R, Q, xv), b = K * Q / xv, d = compararResultados(a, b).dif;
+    return `<tr class="${n === 10 ? "hl" : ""}"><td>${n}</td><td>${g4(xv)}</td><td>${sci(a)}</td><td>${sci(b)}</td><td>${d === null ? "N/D" : d.toFixed(3) + " %"}</td></tr>`;
+  }).join("");
+}
+
+// ==============================================================
+// DATOS Y EXPORTACIÓN
+// ==============================================================
+function renderDatos() {
+  const { xs, Vs } = generarDatos(st.R, st.Q, st.x);
+  $("datLead").textContent = `${xs.length} puntos, de x = 0 a x = ${xs[xs.length - 1].toFixed(4)} m. Los archivos son los mismos que genera el programa de Python.`;
+  $("datBody").innerHTML = xs.map((x, i) => `<tr><td>${i + 1}</td><td>${x.toFixed(6)}</td><td>${pyExp(Vs[i])}</td></tr>`).join("");
+}
+function descargar(nombre, contenido, tipo) {
+  const blob = contenido instanceof Blob ? contenido : new Blob([contenido], { type: tipo });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = nombre;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  aviso(`Descargado: ${nombre}`);
+}
+function exportarCSV() {
+  const { xs, Vs } = generarDatos(st.R, st.Q, st.x);
+  let t = "x (m),V(x) (V)\r\n";
+  xs.forEach((x, i) => { t += `${x.toFixed(6)},${pyExp(Vs[i])}\r\n`; });
+  descargar("datos_potencial.csv", "﻿" + t, "text/csv;charset=utf-8");
+}
+function exportarTXT() {
+  const { xs, Vs } = generarDatos(st.R, st.Q, st.x);
+  let t = "# Potencial eléctrico sobre el eje de un disco cargado\n";
+  t += `# R = ${st.R} m, Q = ${pyExp(st.Q, 2)} C, sigma = ${pyExp(calcularSigma(st.R, st.Q))} C/m^2\n`;
+  t += "# x (m)\tV(x) (V)\n";
+  xs.forEach((x, i) => { t += `${x.toFixed(6)}\t${pyExp(Vs[i])}\n`; });
+  descargar("datos_potencial.txt", t, "text/plain;charset=utf-8");
+}
+function exportarPNG(cual) {
+  if (!st || !ult[cual]) return;
+  if (cual === "far" && st.Q === 0) return aviso("Con Q = 0 no hay gráfica comparativa.");
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+  graficaLineas(svg, null, ult[cual](CLARO), CLARO);
+  const vb = svg.getAttribute("viewBox").split(" ").map(Number);
+  svg.setAttribute("width", vb[2]); svg.setAttribute("height", vb[3]);
+  const img = new Image();
+  img.onload = () => {
+    const k = 3, cv = document.createElement("canvas");
+    cv.width = vb[2] * k; cv.height = vb[3] * k;
+    const ctx = cv.getContext("2d"); ctx.scale(k, k); ctx.drawImage(img, 0, 0);
+    cv.toBlob(b => descargar(cual === "v" ? "grafica_potencial.png" : "grafica_comparacion_puntual.png", b), "image/png");
+  };
+  img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(new XMLSerializer().serializeToString(svg));
+}
+let tAviso;
+function aviso(txt) { const t = $("toast"); t.textContent = txt; t.hidden = false; clearTimeout(tAviso); tAviso = setTimeout(() => t.hidden = true, 2600); }
+
+// ==============================================================
+// PESTAÑAS
+// ==============================================================
+const tabs = [...document.querySelectorAll('[role="tab"]')];
+function abrirTab(tab, foco) {
+  tabs.forEach(t => {
+    const on = t === tab;
+    t.setAttribute("aria-selected", on); t.tabIndex = on ? 0 : -1;
+    $(t.getAttribute("aria-controls")).hidden = !on;
+  });
+  if (foco) tab.focus();
+  try { localStorage.setItem("disco-tab", tab.id); } catch (e) {}
+}
+tabs.forEach((t, i) => {
+  t.addEventListener("click", () => abrirTab(t));
+  t.addEventListener("keydown", ev => {
+    if (ev.key === "ArrowRight") abrirTab(tabs[(i + 1) % tabs.length], true);
+    if (ev.key === "ArrowLeft") abrirTab(tabs[(i - 1 + tabs.length) % tabs.length], true);
+  });
+});
+
+// ==============================================================
+// INICIO
+// ==============================================================
+["inR", "inQ", "inX"].forEach(id => $(id).addEventListener("input", actualizar));
+$("inVman").addEventListener("input", () => st && renderManual());
+$("btnEnunciado").addEventListener("click", () => {
+  $("inR").value = ENUNCIADO.R; $("inQ").value = ENUNCIADO.Q; $("inX").value = ENUNCIADO.x;
+  $("inVman").value = ENUNCIADO.Vman; ENUNCIADO.man.forEach((v, i) => $("man" + i).value = v);
+  actualizar(); aviso("Datos del enunciado cargados");
+});
+$("btnCSV").addEventListener("click", () => st && exportarCSV());
+$("btnTXT").addEventListener("click", () => st && exportarTXT());
+document.querySelectorAll("[data-png]").forEach(b => b.addEventListener("click", () => exportarPNG(b.dataset.png)));
+window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => st && actualizar());
+new MutationObserver(() => st && actualizar()).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+
+construirValidacion();
+try { const t = localStorage.getItem("disco-tab"); if (t && $(t)) abrirTab($(t)); } catch (e) {}
+actualizar();
+</script>
+</body>
+</html>
